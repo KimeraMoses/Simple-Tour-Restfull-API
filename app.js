@@ -10,9 +10,14 @@ app.use((req, res, next) => {
   req.requestTime = new Date().toISOString();
   next();
 });
+const tourRouter = express.Router()
+const userRouter = express.Router()
 
 const tours = JSON.parse(
   fs.readFileSync(`${__dirname}/dev-data/data/tours-simple.json`)
+);
+const users = JSON.parse(
+  fs.readFileSync(`${__dirname}/dev-data/data/users.json`)
 );
 
 //****ROUTE HANDLER ****/
@@ -110,19 +115,116 @@ const createTour = (req, res) => {
   );
 };
 
-//****ROUTES ****/
-// app.get('/api/v1/tours', getAllTours);
-// app.get('/api/v1/tours/:id', getTour);
-// app.patch('/api/v1/tours/:id', updateTour);
-// app.delete('/api/v1/tours/:id', deleteTour);
-// app.post('/api/v1/tours', createTour);
+const getAllUsers = (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    results: users.length,
+    data: {
+      users,
+    },
+  });
+};
 
-app.route('/api/v1/tours').get(getAllTours).post(createTour);
-app
-  .route('/api/v1/tours/:id')
+const getUser = (req, res) => {
+  const Id = req.params.id;
+
+  const user = users.filter((user) => user._id === Id);
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user,
+    },
+  });
+};
+const updateUser = (req, res) => {
+  const Id = req.params.id * 1;
+  if (Id > users.length || !users[Id])
+    return res.status(404).json({ status: 'Fail', message: 'INVALID ID' });
+
+  users[Id] = { ...users[Id], ...req.body };
+  fs.writeFile(
+    `${__dirname}/dev-data/data/users.json`,
+    JSON.stringify(users),
+    (err) => {
+      if (err)
+        res.status(500).json({
+          status: 'fail',
+          message: 'Failed to save tour',
+        });
+      res.status(201).json({
+        status: 'success',
+        updatedAt: req.requestTime,
+        data: {
+          user: users[Id],
+        },
+      });
+    }
+  );
+};
+const deleteUser = (req, res) => {
+  const Id = req.params.id;
+  const userIndex = users.findIndex((obj) => obj._id === Id);
+  users.splice(userIndex, 1);
+
+  fs.writeFile(
+    `${__dirname}/dev-data/data/users.json`,
+    JSON.stringify(users),
+    (err) => {
+      if (err)
+        res.status(500).json({
+          status: 'fail',
+          message: 'Failed to save user',
+        });
+      res.status(204).json({
+        status: 'success',
+        data: null,
+      });
+    }
+  );
+};
+const createUser = (req, res) => {
+  const newId = users[users.length - 1].id + 1;
+  const newUser = Object.assign({ id: newId }, req.body);
+
+  users.push(newUser);
+  fs.writeFile(
+    `${__dirname}/dev-data/data/users.json`,
+    JSON.stringify(users),
+    (err) => {
+      if (err)
+        res.status(500).json({
+          status: 'fail',
+          message: 'Failed to save tour',
+        });
+      res.status(201).json({
+        status: 'success',
+        data: {
+          users: newUser,
+        },
+      });
+    }
+  );
+};
+
+//****ROUTES ****/
+app.use('/api/v1/tours', tourRouter)
+app.use('/api/v1/users', userRouter)
+
+
+tourRouter.route('/').get(getAllTours).post(createTour);
+tourRouter
+  .route('/:id')
   .get(getTour)
   .patch(updateTour)
   .delete(deleteTour);
+
+
+app.route('/').get(getAllUsers).post(createUser);
+app
+  .route('/:id')
+  .get(getUser)
+  .patch(updateUser)
+  .delete(deleteUser);
 
 const port = 3000;
 app.listen(port, () => {
